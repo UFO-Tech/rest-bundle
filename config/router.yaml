@@ -1,0 +1,11 @@
+controllers:
+    resource:
+        path: ../src/Controller/
+        namespace: Ufo\RestBundle\Controller
+    type: attribute
+    format: json
+
+
+ufo_rest_api:
+    resource: 'ufo_rest_api'
+    type: ufo_rest_api

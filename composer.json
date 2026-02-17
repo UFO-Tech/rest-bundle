@@ -1,0 +1,42 @@
+{
+    "name": "ufo-tech/rest-bundle",
+    "version": "1.0.0",
+    "minimum-stability": "stable",
+    "description": "REST API bundle for building RESTful services in the UFO-Tech ecosystem.",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "homepage": "https://github.com/UFO-Tech/rest-bundle",
+    "autoload": {
+        "psr-4": {
+            "Ufo\\RestBundle\\": "src/",
+            "Ufo\\RestBundleTest\\": "tests/"
+        }
+    },
+    "require": {
+        "php": "^8.3",
+        "symfony/event-dispatcher": "^7.2",
+        "ufo-tech/packages": "^1",
+        "ufo-tech/json-rpc-bundle": "^10.0",
+        "cebe/php-openapi": "^1.8"
+    },
+    "require-dev": {
+        "symfony/framework-bundle": "^7.2",
+        "symfony/http-kernel": "^7.2",
+        "phpunit/phpunit": "^11.0"
+    },
+    "authors": [
+        {
+            "name": "Alex Maystrenko",
+            "email": "ashterix69@gmail.com"
+        }
+    ],
+    "prefer-stable": true,
+    "keywords": [
+        "rpc",
+        "rest",
+        "transport",
+        "adapter",
+        "api",
+        "ufo-tech"
+    ]
+}

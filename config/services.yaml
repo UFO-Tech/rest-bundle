@@ -1,0 +1,27 @@
+parameters:
+
+services:
+    # default configuration for services in *this* file
+    _defaults:
+        autowire:      true      # Automatically injects dependencies in your services.
+        autoconfigure: true      # Automatically registers your services as commands, event subscribers, etc.
+
+    Ufo\RestBundle\:
+        resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/RestBundle.php'
+
+
+    Ufo\RestBundle\Services\RpcRestRouteLoader:
+        arguments:
+            $map: '@Ufo\RestBundle\Services\RestServiceMap'
+            $env: '%env(APP_ENV)%'
+        tags:
+            - { name: routing.loader }
+
+    Ufo\RestBundle\Services\RestServiceMap:
+        arguments:
+            $serviceMap: '@Ufo\JsonRpcBundle\Server\ServiceMap\ServiceMap'
+            $toCamelCaseNameConverter: '@serializer.name_converter.snake_case_to_camel_case'
+            $toSnakeCaseNameConverter: '@serializer.name_converter.camel_case_to_snake_case'

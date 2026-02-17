@@ -1,0 +1,5 @@
+# config/routes/ufo_rest_api.yaml
+ufo_rest_api:
+    resource: ../../vendor/ufo-tech/rest-bundle/config/router.yaml
+    prefix: /rest
+    trailing_slash_on_root: false
