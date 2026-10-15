@@ -26,7 +26,7 @@ It enables fast deployment of an API layer only for the methods that must be ava
 ## ⚙️ Installation
 
 ```bash
-composer require ufo-tech/rpc-rest-adapter
+composer require ufo-tech/rest-bundle
 ```
 
 ---
@@ -72,6 +72,14 @@ POST /rest/user/getList
 ---
 
 ## ⚙️ How it works
+
+The YAML loader inherits API-group handling from JsonRpcBundle: context is set
+before route registration, restored afterwards, and route names, priorities and
+legacy aliases are handled centrally. `RestYamlFileLoader` only recognizes the
+REST routing resource and selects `_rest_name_prefix`. Its constructor arguments
+are inherited through autowiring; no separate loader arguments are needed in
+services.yaml. This requires the JsonRpcBundle version containing
+`Routing\ApiYamlFileLoader`; use the matching local checkout during development.
 
 The adapter:
 
@@ -152,3 +160,80 @@ To expose methods in the public REST layer, the standard JsonRpcBundle access co
 ## 🦠 License
 
 MIT © [UFO-Tech](https://github.com/ufo-tech)
+
+## Multiple REST API entry points (JsonRpcBundle 10.2+)
+
+Requires PHP 8.4+ and `ufo-tech/json-rpc-bundle` 10.2+. Import the REST
+routes once per entry point in a YAML routing file:
+
+```yaml
+rest:
+    resource: ../../vendor/ufo-tech/rest-bundle/config/router.yaml
+    prefix: /rest
+    trailing_slash_on_root: false
+
+rest_internal:
+    resource: ../../vendor/ufo-tech/rest-bundle/config/router.yaml
+    prefix: /internal
+    defaults: { api_group: internal }
+    trailing_slash_on_root: false
+
+rest_public:
+    resource: ../../vendor/ufo-tech/rest-bundle/config/router.yaml
+    prefix: /public
+    defaults: { api_group: public }
+    trailing_slash_on_root: false
+```
+
+The URL prefix is independent of the group name. An import without `api_group`
+uses `general`; existing single-entry imports continue to work. RPC and REST
+entry points can coexist and use the same group definitions.
+
+Use RPC `APIGroups` attributes to choose which methods are exposed. A method
+also needs a Symfony `Route` attribute to appear in REST:
+
+```php
+use Symfony\Component\Routing\Attribute\Route;
+use Ufo\JsonRpcBundle\ApiMethod\Interfaces\IRpcService;
+use Ufo\RpcObject\RPC;
+
+#[RPC\Info('catalog')]
+#[RPC\APIGroups(['internal', 'public'], false)]
+#[Route('/catalog', name: 'catalog')]
+class CatalogApi implements IRpcService
+{
+    #[Route('/list', name: 'list', methods: ['GET'])]
+    public function list(): array { return []; }
+
+    #[RPC\APIGroups(['internal'], false)]
+    #[Route('/price', name: 'price', methods: ['POST'])]
+    public function price(int $price): int { return $price; }
+}
+```
+
+Method groups replace class groups; `withDefault: true` adds `general`.
+Without group attributes, methods belong to `general`. `IgnoreApi` excludes a
+method entirely. Requests cannot select another group through query/body fields.
+
+Each entry point has its own routes, versions, OpenAPI and Postman documents:
+`GET /internal`, `/internal/postman`, `/internal/v2`, and
+`/internal/v2/postman`. Documents include only methods and versions available to
+that group and use the current entry point's URL. Version inheritance and
+removed methods follow the RPC service map.
+
+Route names receive a group prefix, for example `internal_ufo_rest_doc`.
+Legacy names such as `ufo_rest_doc` remain aliases for `general`. To import the
+same group twice, supply distinct `name_prefix` values; for `internal` with
+`name_prefix: second_`, the documentation route is
+`internal_second_ufo_rest_doc`.
+
+REST uses the RPC security configuration and group token providers, including
+`protected_api` and `protected_doc`. Shared RPC cache behavior and the RPC
+restrictions on identically named methods across groups also apply to REST.
+
+Run the regression tests from the repository root:
+
+```sh
+composer install
+vendor/bin/phpunit -c phpunit.xml.dist
+```

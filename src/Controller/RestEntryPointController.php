@@ -8,6 +8,9 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Throwable;
+use Ufo\JsonRpcBundle\Security\Interfaces\IRpcSecurity;
+use Ufo\JsonRpcBundle\Security\TokenHolders\HttpTokenHolder;
+use Ufo\JsonRpcBundle\ConfigService\RpcMainConfig;
 use Ufo\RestBundle\DocAdapters\Outputs\PostmanAdapter;
 use Ufo\JsonRpcBundle\Server\RequestPrepare\RequestCarrier;
 use Ufo\JsonRpcBundle\Server\RpcRequestHandler;
@@ -26,6 +29,17 @@ use const JSON_PRETTY_PRINT;
 
 class RestEntryPointController  extends AbstractController
 {
+    public function __construct(
+        private IRpcSecurity $security,
+        private RpcMainConfig $config,
+    ) {}
+
+    private function validateDocumentation(Request $request): void
+    {
+        $this->security->setTokenHolder(new HttpTokenHolder($this->config, $request));
+        $this->security->isValidDocRequest();
+    }
+
     const string REST_API_ENTRYPOINT = RestServiceMap::ROUTE_PREFIX . 'entrypoint';
 
     const string REST_API_DOC = 'ufo_rest_doc';
@@ -38,15 +52,16 @@ class RestEntryPointController  extends AbstractController
         '/{path}',
         name: self::REST_API_ENTRYPOINT,
         requirements: ['path' => '.+'],
-        defaults: ['ver' => Info::DEFAULT_VERSION],
+        defaults: ['ver' => Info::DEFAULT_VERSION, 'rpcRoute' => self::REST_API_ENTRYPOINT],
         methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
         priority: -100
     )]
     #[Route(
         '/{ver}/{path}',
-        name: self::REST_API_ENTRYPOINT . '_ver',
+        name: self::REST_API_ENTRYPOINT.'_ver',
         requirements: ['path' => '.+', 'ver' => 'v\d+'],
-        methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+        defaults: ['rpcRoute' => self::REST_API_ENTRYPOINT],
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         priority: -90
     )]
     public function rest(
@@ -57,6 +72,7 @@ class RestEntryPointController  extends AbstractController
         Request $request,
     ): JsonResponse
     {
+        $responseObj = null;
         try {
             $service = $parser->parse($rpcRoute, $request);
             $requestHandler->handle();
@@ -98,20 +114,30 @@ class RestEntryPointController  extends AbstractController
     }
 
 
-    #[Route(name: self::REST_API_DOC, defaults: ['ver' => Info::DEFAULT_VERSION], methods: ["GET"], priority: 40, format: 'json')]
-    #[Route('/{ver<v\d+>}', name: self::REST_API_DOC_VER, methods: ["GET"], priority: 30, format: 'json')]
+    #[Route(name: self::REST_API_DOC, defaults: ['ver' => Info::DEFAULT_VERSION, '_rest_doc' => true], methods: ["GET"], priority: 40, format: 'json')]
+    #[Route('/{ver<v\d+>}', name: self::REST_API_DOC_VER, defaults: ['_rest_doc' => true], methods: ["GET"], priority: 30, format: 'json')]
     public function openapiAction(OpenApiAdapter $openApiAdapter, Request $request): Response
     {
-        $result = $openApiAdapter->adapt(version: $request->attributes->get('ver'));
-        return new JsonResponse(json_encode($result, JSON_PRETTY_PRINT), json: true);
+        try {
+            $this->validateDocumentation($request);
+            $result = $openApiAdapter->adapt(version: $request->attributes->get('ver'));
+            return new JsonResponse(json_encode($result, JSON_PRETTY_PRINT), json: true);
+        } catch (Throwable $e) {
+            return $this->responseError($request->getPathInfo(), $e, null);
+        }
     }
 
-    #[Route('/{ver<v\d+>}/postman', name: self::POSTMAN_ROUTE_VER, methods: ["GET"], format: 'json')]
-    #[Route('/postman', name: self::POSTMAN_ROUTE, defaults: ['ver' => Info::DEFAULT_VERSION], methods: ["GET"], format: 'json')]
+    #[Route('/{ver<v\d+>}/postman', name: self::POSTMAN_ROUTE_VER, defaults: ['_rest_doc' => true], methods: ["GET"], format: 'json')]
+    #[Route('/postman', name: self::POSTMAN_ROUTE, defaults: ['ver' => Info::DEFAULT_VERSION, '_rest_doc' => true], methods: ["GET"], format: 'json')]
     public function postmanAction(PostmanAdapter $postmanAdapter, Request $request): Response
     {
-        $result = $postmanAdapter->adapt($request->attributes->get('ver'));
-        return new JsonResponse(json_encode($result, JSON_PRETTY_PRINT), json: true);
+        try {
+            $this->validateDocumentation($request);
+            $result = $postmanAdapter->adapt($request->attributes->get('ver'));
+            return new JsonResponse(json_encode($result, JSON_PRETTY_PRINT), json: true);
+        } catch (Throwable $e) {
+            return $this->responseError($request->getPathInfo(), $e, null);
+        }
     }
 
 }

@@ -4,6 +4,8 @@ namespace Ufo\RestBundle\DocAdapters\Outputs;
 use cebe\openapi\spec\Operation;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouterInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Ufo\JsonRpcBundle\Server\ApiGroupContext;
 use Ufo\DTO\Helpers\TypeHintResolver as T;
 use Ufo\JsonRpcBundle\ConfigService\RpcMainConfig;
 use Ufo\JsonRpcBundle\DocAdapters\Traits\JsonSchemaDtoFormatTrait;
@@ -17,6 +19,7 @@ use Ufo\RestBundle\DocAdapters\Outputs\OpenApi\OpenApiSpecBuilder;
 use Ufo\RestBundle\Exceptions\RestResourceNotFoundException;
 use Ufo\RestBundle\Package;
 use Ufo\RestBundle\Services\RestServiceMap;
+use Ufo\JsonRpcBundle\Server\ServiceMap\Reflections\EnumProcessor\EnumsHolder;
 
 use function array_diff_key;
 use function array_flip;
@@ -37,11 +40,15 @@ class OpenApiAdapter
         protected RestServiceMap $serviceMap,
         protected RpcMainConfig $mainConfig,
         protected ChainParamConvertor $paramConvertor,
-        protected RouterInterface $router
+        protected RouterInterface $router,
+        protected ApiGroupContext $apiGroupContext,
+        protected RequestStack $requestStack,
+        protected EnumsHolder $enumsHolder,
     ) {}
 
     public function adapt(bool $fullInfo = true, string $version = Info::DEFAULT_VERSION): array
     {
+        $this->schemas = [];
         $this->version = $version;
         $this->buildSignature();
         $this->buildServer();
@@ -73,9 +80,12 @@ class OpenApiAdapter
 
     protected function buildServer(): void
     {
-        $http = RpcTransport::fromArray($this->mainConfig->url);
+        $http = RpcTransport::fromArray(parse_url($this->requestStack->getCurrentRequest()?->getUri() ?? '') ?: $this->mainConfig->url);
+        $path = $this->version === Info::DEFAULT_VERSION
+            ? $this->router->generate($this->apiGroupContext->getRouteName(RestEntryPointController::REST_API_DOC))
+            : $this->router->generate($this->apiGroupContext->getRouteName(RestEntryPointController::REST_API_DOC_VER), ['ver' => $this->version]);
         $this->builder->addServer(
-            url: $http->getDomainUrl().$this->router->generate(RestEntryPointController::REST_API_DOC),
+            url: $http->getDomainUrl().$path,
             envelop: $this->serviceMap->getEnvelope(),
             rpcEnv: Package::ufoEnvironment()
         );
@@ -160,6 +170,11 @@ class OpenApiAdapter
     protected function getParamConvertor(): ChainParamConvertor
     {
         return $this->paramConvertor;
+    }
+
+    protected function getEnumsHolder(): EnumsHolder
+    {
+        return $this->enumsHolder;
     }
 
 }

@@ -3,6 +3,8 @@ namespace Ufo\RestBundle\DocAdapters\Outputs;
 
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouterInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Ufo\JsonRpcBundle\Server\ApiGroupContext;
 use Ufo\JsonRpcBundle\ConfigService\RpcMainConfig;
 use Ufo\RestBundle\Controller\RestEntryPointController;
 use Ufo\RestBundle\DocAdapters\Outputs\Postman\Blocks\Method;
@@ -24,7 +26,9 @@ class PostmanAdapter
     public function __construct(
         protected RestServiceMap $serviceMap,
         protected RpcMainConfig $mainConfig,
-        protected RouterInterface $router
+        protected RouterInterface $router,
+        protected ApiGroupContext $apiGroupContext,
+        protected RequestStack $requestStack,
     ) {}
 
     public function adapt(string $version = Info::DEFAULT_VERSION): array
@@ -47,10 +51,10 @@ class PostmanAdapter
 
     protected function buildServer(): void
     {
-        $http = RpcTransport::fromArray($this->mainConfig->url);
-        $path = $this->router->generate(RestEntryPointController::REST_API_DOC);
+        $http = RpcTransport::fromArray(parse_url($this->requestStack->getCurrentRequest()?->getUri() ?? '') ?: $this->mainConfig->url);
+        $path = $this->router->generate($this->apiGroupContext->getRouteName(RestEntryPointController::REST_API_DOC));
         if ($this->version !== Info::DEFAULT_VERSION) {
-            $path = $this->router->generate(RestEntryPointController::REST_API_DOC_VER, ['ver' => $this->version]);
+            $path = $this->router->generate($this->apiGroupContext->getRouteName(RestEntryPointController::REST_API_DOC_VER), ['ver' => $this->version]);
         }
         $this->postmanSpecBuilder->addVariable('base_url', $http->getDomainUrl());
 
@@ -94,10 +98,8 @@ class PostmanAdapter
         );
 
         $params = $service->getParams();
-//        $vars = [];
         foreach ($route->compile()->getPathVariables() as $variable) {
             if ($params[$variable] ?? false) {
-//                $vars[$variable] = $params[$variable];
                 unset($params[$variable]);
             }
         }

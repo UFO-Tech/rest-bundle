@@ -35,7 +35,7 @@ class RestBundleExtension extends Extension implements PrependExtensionInterface
         $projectDir = $container->getParameter('kernel.project_dir');
 
         $path = $projectDir.'/config/routes/ufo_json_rpc.yaml';
-        $data = Yaml::parseFile($path);
+        $data = is_file($path) ? Yaml::parseFile($path) : [];
         $prefix = $data['ufo_json_rpc']['prefix'] ?? null;
         $container->setParameter('ufo_api_prefix', $prefix);
     }

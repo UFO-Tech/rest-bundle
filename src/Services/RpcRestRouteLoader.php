@@ -8,8 +8,6 @@ use Ufo\RpcObject\RPC\Info;
 
 class RpcRestRouteLoader extends Loader
 {
-    private bool $loaded = false;
-
     public function __construct(
         protected RestServiceMap $map,
         ?string $env = null,
@@ -20,23 +18,21 @@ class RpcRestRouteLoader extends Loader
 
     public function load(mixed $resource, ?string $type = null): RouteCollection
     {
-        if ($this->loaded) {
-            throw new \RuntimeException('Do not add twice');
-        }
-
         $routes = new RouteCollection();
         foreach ($this->map->getVersions() as $version) {
             foreach ($this->map->getRoutes($version) as $routeName => $route) {
                 $route = clone $route;
+                $route->setDefault('_rest_route', $routeName);
                 if ($version !== Info::DEFAULT_VERSION) {
                     $route->setPath('/' . $version . $route->getPath());
                     $route->setDefault('_ver', $version);
                 }
                 $routes->add($routeName . '_' . $version, $route);
+                $fallback = clone $route;
+                $fallback->setMethods([]);
+                $routes->add($routeName . '_' . $version . '_method_not_allowed', $fallback, -10);
             }
         }
-
-        $this->loaded = true;
 
         return $routes;
     }

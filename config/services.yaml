@@ -10,13 +10,17 @@ services:
         resource: '../src/'
         exclude:
             - '../src/DependencyInjection/'
-            - '../src/RestBundle.php'
-
+            - '../src/RestBundleBundle.php'
+            - '../src/Services/RpcFromRest.php'
+            - '../src/DocAdapters/Outputs/OpenApi/'
+            - '../src/DocAdapters/Outputs/Postman/'
+            - '../src/Exceptions/'
+            - '../src/Package.php'
 
     Ufo\RestBundle\Services\RpcRestRouteLoader:
         arguments:
             $map: '@Ufo\RestBundle\Services\RestServiceMap'
-            $env: '%env(APP_ENV)%'
+            $env: '%kernel.environment%'
         tags:
             - { name: routing.loader }
 

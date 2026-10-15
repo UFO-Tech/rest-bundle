@@ -1,0 +1,27 @@
+legacy:
+    resource: ../../config/router.yaml
+    prefix: /rest
+    trailing_slash_on_root: false
+internal:
+    resource: ../../config/router.yaml
+    prefix: /internal
+    defaults: { api_group: internal }
+    trailing_slash_on_root: false
+public:
+    resource: ../../config/router.yaml
+    prefix: /public
+    defaults: { api_group: public }
+    trailing_slash_on_root: false
+internal_alias:
+    resource: ../../config/router.yaml
+    prefix: /second
+    name_prefix: second_
+    defaults: { api_group: internal }
+    trailing_slash_on_root: false
+rpc:
+    resource: ../../vendor/ufo-tech/json-rpc-bundle/config/router.yaml
+    prefix: /rpc
+    trailing_slash_on_root: false
+unrelated:
+    path: /unrelated
+    controller: 'Ufo\RestBundleTest\Fixtures\Procedures\Catalog::status'

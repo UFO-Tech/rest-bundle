@@ -21,8 +21,11 @@ use Ufo\RpcError\WrongWayException;
 use Ufo\RestBundle\Exceptions\RestResourceNotAllowedException;
 use Ufo\RestBundle\Exceptions\RestResourceNotFoundException;
 use Ufo\RestBundle\Interfaces\RestRequestParserInterface;
+use Ufo\RpcObject\RPC\Info;
+use Ufo\JsonRpcBundle\Server\ApiGroupContext;
+use Ufo\RpcObject\RPC\APIGroups;
+use Ufo\JsonRpcBundle\EventDrivenModel\RpcEventFactory;
 
-use function str_replace;
 
 class RestRequestParser implements RestRequestParserInterface
 {
@@ -31,7 +34,8 @@ class RestRequestParser implements RestRequestParserInterface
         protected RequestCarrier $requestCarrier,
         protected IRpcSecurity $rpcSecurity,
         protected RpcMainConfig $rpcConfig,
-
+        protected ApiGroupContext $apiGroupContext,
+        protected RpcEventFactory $eventFactory,
     ) {}
 
     /**
@@ -46,14 +50,21 @@ class RestRequestParser implements RestRequestParserInterface
      */
     public function parse(string $routeName, Request $request): Service
     {
-        $ver = $request->attributes->get('ver');
+        $this->apiGroupContext->setGroup($request->attributes->get('api_group', APIGroups::DEFAULT_GROUP));
+        $ver = $request->attributes->get('ver', Info::DEFAULT_VERSION);
         try {
-            $routeName = str_replace('_' . $ver, '', $routeName);
+            if (!$request->attributes->has('_rest_route') && str_ends_with($routeName, '_' . $ver)) {
+                $routeName = substr($routeName, 0, -strlen('_' . $ver));
+            }
             $route = $this->serviceMap->getRoute($routeName, $ver);
         } catch (RestResourceNotFoundException $e) {
             throw new RestResourceNotFoundException('Route "'.$request->getPathInfo().'" is not found in REST Service Map');
         }
-        if (!in_array($request->getMethod(), $route->getMethods())) {
+        $method = $request->getMethod();
+        if ($method === 'HEAD' && in_array('GET', $route->getMethods(), true)) {
+            $method = 'GET';
+        }
+        if (!in_array($method, $route->getMethods(), true)) {
             throw new RestResourceNotAllowedException();
         }
         $service = $this->serviceMap->getService($routeName, $ver);
@@ -71,6 +82,7 @@ class RestRequestParser implements RestRequestParserInterface
      */
     protected function initRequest(IRpcTokenHolder $holder, IRpcRequestCarrier $carrier): void
     {
+        $this->eventFactory->reset();
         $this->rpcSecurity->setTokenHolder($holder);
         $this->requestCarrier->setCarrier($carrier);
         $this->rpcSecurity->isValidApiRequest();

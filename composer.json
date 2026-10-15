@@ -12,10 +12,10 @@
         }
     },
     "require": {
-        "php": "^8.3",
+        "php": "^8.4",
         "symfony/event-dispatcher": "^7.2",
         "ufo-tech/packages": "^1",
-        "ufo-tech/json-rpc-bundle": "^10.0",
+        "ufo-tech/json-rpc-bundle": "^10.2",
         "cebe/php-openapi": "^1.8"
     },
     "require-dev": {

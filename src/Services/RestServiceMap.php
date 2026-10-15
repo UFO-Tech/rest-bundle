@@ -3,30 +3,21 @@
 namespace Ufo\RestBundle\Services;
 
 use ReflectionClass;
-use RuntimeException;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Route as SymfonyRoute;
 use Symfony\Component\Serializer\NameConverter\CamelCaseToSnakeCaseNameConverter;
 use Symfony\Component\Serializer\NameConverter\SnakeCaseToCamelCaseNameConverter;
 use Ufo\RpcObject\RPC\Info;
+use Ufo\JsonRpcBundle\Server\ApiGroupContext;
 use Ufo\RestBundle\Package;
 use Ufo\JsonRpcBundle\Server\ServiceMap\IServiceHolder;
 use Ufo\JsonRpcBundle\Server\ServiceMap\Service;
 use Ufo\RestBundle\Exceptions\RestResourceNotFoundException;
 
-use function array_diff_key;
-use function array_flip;
-use function array_intersect_key;
 use function array_key_exists;
-use function array_keys;
-use function array_merge;
-use function array_replace;
-use function array_unique;
 use function explode;
 use function in_array;
-use function usort;
-use function version_compare;
 
 #[AutoconfigureTag(IServiceHolder::TAG)]
 class RestServiceMap implements IServiceHolder
@@ -38,7 +29,6 @@ class RestServiceMap implements IServiceHolder
      * @var array<string,array<string,Service>>
      */
     protected array $services = [];
-    protected array $excludePrevious = [];
 
     /**
      * @var array<class-string,Route>
@@ -50,33 +40,48 @@ class RestServiceMap implements IServiceHolder
      */
     protected array $routes = [];
 
-    /**
-     * @var array<string,string>
-     */
-    protected array $routesMap = [];
+    private array $groupMaps = [];
+    private ?string $activeGroup = null;
+    private array $versions = [];
 
     public function __construct(
         protected IServiceHolder $serviceMap,
         protected SnakeCaseToCamelCaseNameConverter $toCamelCaseNameConverter,
-        protected CamelCaseToSnakeCaseNameConverter $toSnakeCaseNameConverter
-    ) {
-        $this->init();
+        protected CamelCaseToSnakeCaseNameConverter $toSnakeCaseNameConverter,
+        protected ApiGroupContext $apiGroupContext,
+    ) {}
+
+    private function activateGroup(): void
+    {
+        $group = $this->apiGroupContext->getGroup();
+        if ($this->activeGroup === $group) {
+            return;
+        }
+        if (!isset($this->groupMaps[$group])) {
+            $this->services = $this->routes = $this->classRoutes = [];
+            $this->versions = $this->serviceMap->getVersions();
+            $this->init();
+            $this->groupMaps[$group] = [$this->services, $this->routes, $this->versions];
+        }
+        [$this->services, $this->routes, $this->versions] = $this->groupMaps[$group];
+        $this->activeGroup = $group;
     }
 
     protected function init(): void
     {
-        $versions = $this->serviceMap->getVersions();
+        $versions = $this->versions;
         foreach ($versions as $version) {
             foreach ($this->serviceMap->getServices($version) as $service) {
                 /** @var Route $route */
                 if ($route = $service->getAttrCollection()->getAttribute(Route::class)) {
+                    $route = clone $route;
                     if (!$route->name) {
                         $route->name = $this->toSnakeCaseNameConverter->normalize($service->getMethodName());
                     }
                     if (empty($route->methods)) {
                         $route->methods = ['POST'];
                     }
-                    $this->addService(clone $route, $service, $version);
+                    $this->addService($route, $service, $version);
                 }
             }
         }
@@ -118,76 +123,40 @@ class RestServiceMap implements IServiceHolder
             $route->path,
             methods: $route->methods
         );
-        $this->routesMap[$service->getName()] = $route->name;
-        $this->excludePrevious[$version] = array_unique(array_merge($this->excludePrevious[$version] ?? [], $service->apiClassInfo->removedMethods));
 
     }
 
     public function getService(string $serviceName, string $version = Info::DEFAULT_VERSION): Service
     {
-        return $this->services[$version][$serviceName]
-               ?? throw new RestResourceNotFoundException('Service "'.$serviceName.'" for version "'.$version.'" is not found on REST Service Map');
+        return $this->getServices($version)[$serviceName]
+            ?? throw new RestResourceNotFoundException('Service "'.$serviceName.'" for version "'.$version.'" is not found on REST Service Map');
     }
 
-    /**
-     * @return SymfonyRoute[]
-     */
+    /** @return SymfonyRoute[] */
     public function getRoutes(string $version = Info::DEFAULT_VERSION): array
     {
-        $versions = $this->getVersions();
-        if (!in_array($version, $versions, true)) {
-            throw new RuntimeException('Version "'.$version.'" is not registered on REST Service Map');
-        }
-        usort($versions, 'version_compare');
-
-        $result = [];
-
-        foreach ($versions as $ver) {
-            if (version_compare($ver, $version, '<=')) {
-                $result = array_replace($result, $this->routes[$ver]);
-                $excludeServices = $this->excludePrevious[$version] ?? [];
-                $excludeRoutes = array_intersect_key($this->routesMap, array_flip($excludeServices));
-                $result = array_diff_key($result, array_flip($excludeRoutes));
-            }
-        }
-        return $result;
+        $this->assertVersion($version);
+        return $this->routes[$version] ?? [];
     }
 
-    /**
-     * @param string $version
-     * @return Service[]
-     */
+    /** @return Service[] */
     public function getServices(string $version = Info::DEFAULT_VERSION): array
     {
-        $versions = $this->getVersions();
-        if (!in_array($version, $versions, true)) {
-            throw new RuntimeException('Version "'.$version.'" is not registered on REST Service Map');
-        }
-        usort($versions, 'version_compare');
-
-        $result = [];
-
-        foreach ($versions as $ver) {
-            if (version_compare($ver, $version, '<=')) {
-                $result = array_replace($result, $this->services[$ver]);
-                $excludeServices = $this->excludePrevious[$version] ?? [];
-                $excludeRoutes = array_intersect_key($this->routesMap, array_flip($excludeServices));
-                $result = array_diff_key($result, array_flip($excludeRoutes));
-            }
-        }
-
-        return $result;
+        $this->assertVersion($version);
+        return $this->services[$version] ?? [];
     }
 
-    /**
-     * @param string $routeName
-     * @param string $version
-     * @return SymfonyRoute
-     * @throws RestResourceNotFoundException
-     */
+    private function assertVersion(string $version): void
+    {
+        if (!in_array($version, $this->getVersions(), true)) {
+            throw new RestResourceNotFoundException('Version "'.$version.'" is not registered on REST Service Map');
+        }
+    }
+
     public function getRoute(string $routeName, string $version = Info::DEFAULT_VERSION): SymfonyRoute
     {
-        return $this->routes[$version][$routeName] ?? throw new RestResourceNotFoundException('Route "'.$routeName.'" for version "'.$version.'" is not adapt for REST Service Map');
+        return $this->getRoutes($version)[$routeName]
+            ?? throw new RestResourceNotFoundException('Route "'.$routeName.'" for version "'.$version.'" is not found on REST Service Map');
     }
 
     public function getEnvelope(): string
@@ -200,7 +169,8 @@ class RestServiceMap implements IServiceHolder
 
     public function getVersions(): array
     {
-        return array_keys($this->services);
+        $this->activateGroup();
+        return $this->versions;
     }
 
 }

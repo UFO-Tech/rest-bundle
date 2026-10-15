@@ -3,3 +3,15 @@ ufo_rest_api:
     resource: ../../vendor/ufo-tech/rest-bundle/config/router.yaml
     prefix: /rest
     trailing_slash_on_root: false
+
+#    ufo_rest_api_internal:
+#        resource: ../../vendor/ufo-tech/rest-bundle/config/router.yaml
+#        prefix: /internal
+#        defaults: { api_group: internal }
+#        trailing_slash_on_root: false
+#
+#    ufo_rest_api_public:
+#        resource: ../../vendor/ufo-tech/rest-bundle/config/router.yaml
+#        prefix: /public
+#        defaults: { api_group: public }
+#        trailing_slash_on_root: false
