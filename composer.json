@@ -1,6 +1,5 @@
 {
     "name": "ufo-tech/rest-bundle",
-    "version": "1.0.0",
     "minimum-stability": "stable",
     "description": "REST API bundle for building RESTful services in the UFO-Tech ecosystem.",
     "type": "symfony-bundle",
@@ -26,7 +25,7 @@
     },
     "authors": [
         {
-            "name": "Alex Maystrenko",
+            "name": "Alex Maistrenko",
             "email": "ashterix69@gmail.com"
         }
     ],

@@ -50,6 +50,8 @@ commit-a:
 	git add .; \
 	git commit --no-edit --amend; \
 	git push --force; \
+		printf "\033[36mExisting tags:\033[0m\n"; \
+    	git tag --sort=-v:refname; \
 	printf "\033[33mTag (enter щоб пропустити): \033[0m"; \
 	read TAG; \
 	[ -z "$$TAG" ] && exit 0; \

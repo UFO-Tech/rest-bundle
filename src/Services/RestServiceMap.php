@@ -198,11 +198,6 @@ class RestServiceMap implements IServiceHolder
         return $this->envelope;
     }
 
-    public function isFromCache(): bool
-    {
-        return method_exists($this->serviceMap, 'isFromCache') ? $this->serviceMap->isFromCache() : false;
-    }
-
     public function getVersions(): array
     {
         return array_keys($this->services);

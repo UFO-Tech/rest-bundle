@@ -77,10 +77,7 @@ class OpenApiAdapter
         $this->builder->addServer(
             url: $http->getDomainUrl().$this->router->generate(RestEntryPointController::REST_API_DOC),
             envelop: $this->serviceMap->getEnvelope(),
-            rpcEnv: [
-                ...['fromCache' => $this->serviceMap->isFromCache()],
-                ...Package::ufoEnvironment(),
-            ]
+            rpcEnv: Package::ufoEnvironment()
         );
     }
 
