@@ -4,63 +4,40 @@ namespace Ufo\RestBundle\DocAdapters\Outputs;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Ufo\JsonRpcBundle\DocAdapters\Outputs\AbstractPostmanAdapter;
 use Ufo\JsonRpcBundle\Server\ApiGroupContext;
 use Ufo\JsonRpcBundle\ConfigService\RpcMainConfig;
 use Ufo\RestBundle\Controller\RestEntryPointController;
-use Ufo\RestBundle\DocAdapters\Outputs\Postman\Blocks\Method;
 use Ufo\RestBundle\DocAdapters\Outputs\Postman\PostmanSpecBuilder;
-use Ufo\JsonRpcBundle\Server\ServiceMap\Reflections\ParamDefinition;
 use Ufo\JsonRpcBundle\Server\ServiceMap\Service;
-use Ufo\RpcObject\RPC\Info;
 use Ufo\RpcObject\RpcTransport;
 use Ufo\RestBundle\Exceptions\RestResourceNotFoundException;
 use Ufo\RestBundle\Services\RestServiceMap;
 
-use function explode;
-
-class PostmanAdapter
+class PostmanAdapter extends AbstractPostmanAdapter
 {
-    protected PostmanSpecBuilder $postmanSpecBuilder;
-    protected string $version = Info::DEFAULT_VERSION;
+    protected const string PREFIX = 'REST';
+    protected const string ROUTE = RestEntryPointController::REST_API_DOC;
+    protected const string ROUTE_VER = RestEntryPointController::REST_API_DOC_VER;
 
     public function __construct(
         protected RestServiceMap $serviceMap,
-        protected RpcMainConfig $mainConfig,
-        protected RouterInterface $router,
-        protected ApiGroupContext $apiGroupContext,
+        RpcMainConfig $mainConfig,
+        RouterInterface $router,
+        ApiGroupContext $apiGroupContext,
         protected RequestStack $requestStack,
-    ) {}
-
-    public function adapt(string $version = Info::DEFAULT_VERSION): array
-    {
-        $this->version = $version;
-        $this->buildSignature();
-        $this->buildServer();
-        $this->buildServices();
-        return $this->postmanSpecBuilder->build();
+    ) {
+        parent::__construct($mainConfig, $router, $apiGroupContext);
     }
 
-    protected function buildSignature(): void
+    protected function createSpecBuilder(string $name, string $description, string $version): PostmanSpecBuilder
     {
-        $this->postmanSpecBuilder = PostmanSpecBuilder::createBuilder(
-            name: 'REST: ' . $this->mainConfig->docsConfig->projectName,
-            description: $this->mainConfig->docsConfig->projectDesc,
-            version: $this->version,
-        );
+        return PostmanSpecBuilder::createBuilder($name, $description, $version);
     }
 
-    protected function buildServer(): void
+    protected function getTransport(): RpcTransport
     {
-        $http = RpcTransport::fromArray(parse_url($this->requestStack->getCurrentRequest()?->getUri() ?? '') ?: $this->mainConfig->url);
-        $path = $this->router->generate($this->apiGroupContext->getRouteName(RestEntryPointController::REST_API_DOC));
-        if ($this->version !== Info::DEFAULT_VERSION) {
-            $path = $this->router->generate($this->apiGroupContext->getRouteName(RestEntryPointController::REST_API_DOC_VER), ['ver' => $this->version]);
-        }
-        $this->postmanSpecBuilder->addVariable('base_url', $http->getDomainUrl());
-
-        $this->postmanSpecBuilder->addServer(
-            $http->getDomainUrl() . $path,
-        );
+        return RpcTransport::fromArray(parse_url($this->requestStack->getCurrentRequest()?->getUri() ?? '') ?: $this->mainConfig->url);
     }
 
     protected function buildServices(): void
@@ -77,22 +54,10 @@ class PostmanAdapter
 
     protected function buildService(Service $service, Route $route): void
     {
-        $variableApiToken = $this->postmanSpecBuilder->addVariable('apiToken', '!changeMe!');
-        $headers = [
-            [
-                'key' => 'Content-Type',
-                'value' => 'application/json',
-            ],
-            [
-                'key' => $this->mainConfig->securityConfig->tokenName,
-                'value' => '{{' . $variableApiToken->key . '}}',
-            ]
-        ];
-
         $method = $this->postmanSpecBuilder->buildMethod(
             name: $route->getPath(),
             description: $service->getDescription(),
-            headers: $headers,
+            headers: $this->buildHeaders(),
             folder: $service->procedure,
             httpMethod: $route->getMethods()[0]
         );
@@ -107,14 +72,6 @@ class PostmanAdapter
         foreach ($params as $param) {
             $this->buildParam($method, $param);
         }
-    }
-
-    protected function buildParam(Method $method, ParamDefinition $param): void
-    {
-        $this->postmanSpecBuilder->buildParam(
-            $method,
-            $param
-        );
     }
 
 }

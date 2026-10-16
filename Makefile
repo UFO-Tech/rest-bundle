@@ -68,3 +68,6 @@ console: setup
 %:
 	@:
 
+
+test: CMD = test
+test: composer
