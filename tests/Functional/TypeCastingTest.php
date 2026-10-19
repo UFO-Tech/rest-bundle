@@ -38,7 +38,7 @@ class TypeCastingTest extends FunctionalTestCase
 
         [$status, $problem] = $this->json('/typed-api/typed/items/abc');
         self::assertSame(400, $status);
-        self::assertSame(['id' => 'Parameter "id" must be of type int, string given'], $problem['detail-data']);
+        self::assertSame(['id' => ['Parameter "id" must be of type int, string given']], $problem['detail-data']);
 
         foreach (['active=yes', 'ratio=1,5', 'limit=1.5'] as $query) {
             self::assertSame(400, $this->json('/typed-api/typed/items/1?'.$query)[0], $query);

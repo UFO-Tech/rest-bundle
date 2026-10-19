@@ -15,7 +15,7 @@
         "php": "^8.4",
         "symfony/event-dispatcher": "^7.2|^8.0",
         "ufo-tech/packages": "^1",
-        "ufo-tech/json-rpc-bundle": "^10.4.3",
+        "ufo-tech/json-rpc-bundle": "^10.4.4",
         "cebe/php-openapi": "^1.8"
     },
     "require-dev": {

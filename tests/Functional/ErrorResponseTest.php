@@ -60,7 +60,7 @@ class ErrorResponseTest extends FunctionalTestCase
 
         [$status, $problem] = $this->json('/internal/catalog/echo/1', 'POST', '{}');
         self::assertSame(400, $status);
-        self::assertSame(['value' => 'Required parameter "value" not passed'], $problem['detail-data']);
+        self::assertSame(['value' => ['Required parameter "value" not passed']], $problem['detail-data']);
 
         [$status, $problem] = $this->json('/errors-api/errors/positive', 'POST', '{"amount":"abc"}');
         self::assertSame(400, $status);
@@ -70,7 +70,7 @@ class ErrorResponseTest extends FunctionalTestCase
     }
 
     /**
-     * Scalars are cast by RpcFromRest (see TypeCastingTest); enums are converted by the RPC core (JsonRpcBundle 10.4.3).
+     * Scalars are cast by RpcFromRest (see TypeCastingTest); enums are converted by the RPC core (JsonRpcBundle 10.4.4).
      */
     public function testEnumIsConvertedByTheCore(): void
     {
@@ -80,10 +80,12 @@ class ErrorResponseTest extends FunctionalTestCase
         self::assertSame([200, 'csv'], $this->json('/internal/catalog/format?format=csv', 'POST'));
         self::assertSame([200, 'json'], $this->json('/internal/catalog/format', 'POST', '{"format":"json"}'));
 
-        // The core converter throws a plain RuntimeException for an unknown case, so it is an internal error.
-        [$status, $problem] = $this->json('/internal/catalog/format?format=xml', 'POST');
-        self::assertSame(500, $status);
-        self::assertStringStartsWith("Invalid value 'xml' for enum", $problem['detail']);
+        foreach ([['/internal/catalog/format?format=xml', null], ['/internal/catalog/format', '{"format":"xml"}']] as [$path, $body]) {
+            [$status, $problem] = $this->json($path, 'POST', $body);
+            self::assertSame(400, $status);
+            $this->assertProblem($problem, 400, RestBadRequestException::class, '/internal/catalog/format', 'Invalid Data for call method: catalog.format');
+            self::assertSame(['format' => ['Invalid value "xml", expected one of: json, csv']], $problem['detail-data']);
+        }
     }
 
     public function testRequestErrors(): void
