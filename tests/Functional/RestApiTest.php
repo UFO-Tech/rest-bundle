@@ -2,21 +2,12 @@
 
 namespace Ufo\RestBundleTest\Functional;
 
-use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\HttpFoundation\Request;
+use Ufo\RestBundleTest\Fixtures\PostResponseRecorder;
 use Ufo\RestBundleTest\TestKernel;
 
-class RestApiTest extends KernelTestCase
+class RestApiTest extends FunctionalTestCase
 {
-    protected static function getKernelClass(): string { return TestKernel::class; }
-
-    protected function tearDown(): void
-    {
-        parent::tearDown();
-        TestKernel::$security = ['protected_api' => false, 'protected_doc' => false];
-        restore_exception_handler();
-    }
-
     private function request(string $path, string $method = 'GET', ?string $body = null, ?string $token = null): array
     {
         $request = Request::create('http://localhost'.$path, $method, server: ['CONTENT_TYPE' => 'application/json', ...($token === null ? [] : ['HTTP_UFO_RPC_TOKEN' => $token])], content: $body);
@@ -175,6 +166,55 @@ class RestApiTest extends KernelTestCase
         $response = self::$kernel->handle($request);
         self::assertSame(200, $response->getStatusCode());
         self::assertSame(['id' => 'form', 'value' => 'json'], json_decode($response->getContent(), true));
+    }
+
+    public function testDocsAreTranslatedByAcceptLanguage(): void
+    {
+        self::bootKernel();
+        $docs = function (string $path, ?string $language): array {
+            $request = Request::create('http://localhost'.$path, server: $language === null ? [] : ['HTTP_ACCEPT_LANGUAGE' => $language]);
+            $response = self::$kernel->handle($request);
+            self::assertSame(200, $response->getStatusCode());
+            return [json_decode($response->getContent(), true), $response];
+        };
+
+        [$doc, $response] = $docs('/public', 'uk-UA,uk;q=0.9');
+        self::assertSame('Спільний товар', $doc['paths']['/catalog/shared']['get']['summary']);
+        self::assertSame('Товар, доступний усім групам', $doc['paths']['/catalog/shared']['get']['description']);
+        self::assertSame('uk', $response->headers->get('Content-Language'));
+        self::assertContains('Accept-Language', $response->getVary());
+
+        [$doc] = $docs('/internal', 'uk');
+        self::assertSame('Спільний товар для внутрішнього API', $doc['paths']['/catalog/shared']['get']['summary']);
+        self::assertSame('Товар, доступний усім групам', $doc['paths']['/catalog/shared']['get']['description']);
+
+        [$doc, $response] = $docs('/public', null);
+        self::assertSame('Shared item', $doc['paths']['/catalog/shared']['get']['summary']);
+        self::assertSame('en', $response->headers->get('Content-Language'));
+        self::assertSame('catalog.echoValue', $doc['paths']['/catalog/echo/{id}']['post']['summary']);
+        self::assertArrayNotHasKey('description', $doc['paths']['/catalog/echo/{id}']['post']);
+
+        [$postman] = $docs('/public/postman', 'uk');
+        self::assertStringContainsString('Товар, доступний усім групам', json_encode($postman, JSON_UNESCAPED_UNICODE));
+    }
+
+    public function testPostResponseFiresForSuccessfulRestCalls(): void
+    {
+        self::bootKernel();
+        $recorder = self::getContainer()->get(PostResponseRecorder::class);
+
+        $request = Request::create('http://localhost/public/catalog/shared');
+        $response = self::$kernel->handle($request);
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame([], $recorder->methods, 'POST_RESPONSE is deferred to kernel.terminate');
+        self::$kernel->terminate($request, $response);
+        self::assertSame(['catalog.shared'], $recorder->methods);
+
+        $request = Request::create('http://localhost/internal/catalog/echo/1', 'POST', server: ['CONTENT_TYPE' => 'application/json'], content: '{}');
+        $response = self::$kernel->handle($request);
+        self::assertSame(400, $response->getStatusCode(), $response->getContent());
+        self::$kernel->terminate($request, $response);
+        self::assertSame(['catalog.shared'], $recorder->methods, 'no POST_RESPONSE for an error response');
     }
 
 }

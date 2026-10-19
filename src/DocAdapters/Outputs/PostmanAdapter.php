@@ -25,9 +25,9 @@ class PostmanAdapter extends AbstractPostmanAdapter
         RpcMainConfig $mainConfig,
         RouterInterface $router,
         ApiGroupContext $apiGroupContext,
-        protected RequestStack $requestStack,
+        RequestStack $requestStack,
     ) {
-        parent::__construct($mainConfig, $router, $apiGroupContext);
+        parent::__construct($mainConfig, $router, $apiGroupContext, $requestStack);
     }
 
     protected function createSpecBuilder(string $name, string $description, string $version): PostmanSpecBuilder
@@ -37,7 +37,7 @@ class PostmanAdapter extends AbstractPostmanAdapter
 
     protected function getTransport(): RpcTransport
     {
-        return RpcTransport::fromArray(parse_url($this->requestStack->getCurrentRequest()?->getUri() ?? '') ?: $this->mainConfig->url);
+        return RpcTransport::fromArray(parse_url($this->requestStack?->getCurrentRequest()?->getUri() ?? '') ?: $this->mainConfig->url);
     }
 
     protected function buildServices(): void
@@ -56,7 +56,7 @@ class PostmanAdapter extends AbstractPostmanAdapter
     {
         $method = $this->postmanSpecBuilder->buildMethod(
             name: $route->getPath(),
-            description: $service->getDescription(),
+            description: $service->getDescription($this->requestStack?->getCurrentRequest()?->getLocale()),
             headers: $this->buildHeaders(),
             folder: $service->procedure,
             httpMethod: $route->getMethods()[0]

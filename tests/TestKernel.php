@@ -10,7 +10,12 @@ use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
 use Ufo\JsonRpcBundle\UfoJsonRpcBundle;
 use Ufo\RestBundle\RestBundleBundle;
+use Ufo\RestBundleTest\Fixtures\AdapterController;
+use Ufo\RestBundleTest\Fixtures\AdapterRouteImport;
+use Ufo\RestBundleTest\Fixtures\PostResponseRecorder;
 use Ufo\RestBundleTest\Fixtures\Procedures\Catalog;
+use Ufo\RestBundleTest\Fixtures\Procedures\Errors;
+use Ufo\RestBundleTest\Fixtures\Procedures\Typed;
 use Ufo\RestBundleTest\Fixtures\Procedures\PlainApi;
 use Ufo\RestBundleTest\Fixtures\Procedures\CatalogV2;
 
@@ -37,12 +42,18 @@ class TestKernel extends Kernel
             'cache' => [],
             'security' => self::$security,
             'docs' => ['project_name' => 'REST tests', 'validations' => []],
+            'translations' => ['paths' => [__DIR__.'/Fixtures/translations']],
         ]);
         $services = $c->services();
         $services->defaults()->autowire()->autoconfigure()->public();
         $services->set(Catalog::class);
         $services->set(CatalogV2::class);
         $services->set(PlainApi::class);
+        $services->set(Errors::class);
+        $services->set(Typed::class);
+        $services->set(PostResponseRecorder::class);
+        $services->set(AdapterRouteImport::class);
+        $services->set(AdapterController::class)->tag('controller.service_arguments');
     }
 
     protected function configureRoutes(RoutingConfigurator $routes): void

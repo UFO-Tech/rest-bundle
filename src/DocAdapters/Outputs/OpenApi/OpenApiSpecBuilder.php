@@ -15,7 +15,6 @@ use cebe\openapi\spec\RequestBody;
 use cebe\openapi\spec\Response;
 use cebe\openapi\spec\Schema;
 use cebe\openapi\spec\Server;
-use Ufo\RpcObject\RPC\Param;
 use Ufo\RestBundle\Exceptions\RestApplicationException;
 use Ufo\RestBundle\Exceptions\RestBadRequestException;
 use Ufo\RestBundle\Exceptions\RestErrorInterface;
@@ -126,11 +125,12 @@ class OpenApiSpecBuilder
         string $path,
         string $summary,
         array $vars = [],
-        bool $deprecated = false
+        bool $deprecated = false,
+        ?string $description = null,
     ): Operation
     {
         /**
-         * @var Param $var
+         * @var array|mixed $var JSON schema of the path variable; anything else is documented as a string
          */
         $params = [];
         foreach ($vars as $name => $var) {
@@ -138,14 +138,13 @@ class OpenApiSpecBuilder
                 'name' => $name,
                 'in' => 'path',
                 'required' => true,
-                'schema' => new Schema([
-                    'type' => 'string',
-                ]),
+                'schema' => new Schema(is_array($var) && $var ? $var : ['type' => 'string']),
             ]);
         }
         $operation = new Operation([
             ...[
                 'summary' => empty($summary) ? $operationId : $summary,
+                ...(empty($description) ? [] : ['description' => $description]),
                 'operationId' => $operationId,
                 'responses' => [
                     '200' => new Response([

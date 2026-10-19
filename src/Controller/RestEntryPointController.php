@@ -13,7 +13,7 @@ use Ufo\JsonRpcBundle\Security\TokenHolders\HttpTokenHolder;
 use Ufo\JsonRpcBundle\ConfigService\RpcMainConfig;
 use Ufo\RestBundle\DocAdapters\Outputs\PostmanAdapter;
 use Ufo\JsonRpcBundle\Server\RequestPrepare\RequestCarrier;
-use Ufo\JsonRpcBundle\Server\RpcRequestHandler;
+use Ufo\JsonRpcBundle\Server\RpcExecutor;
 use Ufo\RpcObject\RPC\Info;
 use Ufo\RestBundle\DocAdapters\Outputs\OpenApiAdapter;
 use Ufo\RestBundle\Exceptions\RestErrorInterface;
@@ -68,16 +68,15 @@ class RestEntryPointController  extends AbstractController
         string $rpcRoute,
         RestRequestParserInterface $parser,
         RequestCarrier $requestCarrier,
-        RpcRequestHandler $requestHandler,
+        RpcExecutor $rpcExecutor,
         Request $request,
     ): JsonResponse
     {
         $responseObj = null;
         try {
-            $service = $parser->parse($rpcRoute, $request);
-            $requestHandler->handle();
-
-            $responseObj = $requestCarrier->getRequestObject()->getResponseObject();
+            $parser->parse($rpcRoute, $request);
+            // The parser has checked the token and set the carrier; the executor runs the request the way the core does.
+            $responseObj = $rpcExecutor->execute($requestCarrier->getCarrier());
             $responseObj->throwError();
 
             return new JsonResponse($responseObj->getResult(), 200);

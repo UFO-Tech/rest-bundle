@@ -109,17 +109,23 @@ class OpenApiAdapter
         $vars = [];
         foreach ($route->compile()->getPathVariables() as $variable) {
             if ($params[$variable] ?? false) {
-                $vars[$variable] = $params[$variable];
+                // RpcFromRest casts path values to the parameter type, so the parameter schema applies.
+                $vars[$variable] = $this->schemaForParam($params[$variable], $service);
                 unset($params[$variable]);
             }
         }
+        $locale = $this->requestStack->getCurrentRequest()?->getLocale();
+        $title = $service->getTitle($locale);
+        $description = $service->getDescription($locale);
+        // Without a title the description stays the summary, as before titles existed.
         $method = $this->builder->buildOperation(
-            operationId: $service->getName(),
+            operationId: $service->name,
             method: current($route->getMethods()),
             path: $route->getPath(),
-            summary: $service->getDescription(),
+            summary: $title ?? $description,
             vars: $vars,
             deprecated: $service->isDeprecated(),
+            description: $title === null ? null : $description,
         );
 
         array_map(
@@ -151,7 +157,7 @@ class OpenApiAdapter
             throws: $throwClasses,
         );
 
-        $this->builder->addTag($method, current(explode($service->concat, $service->getName())));
+        $this->builder->addTag($method, current(explode($service->concat, $service->name)));
 
     }
 

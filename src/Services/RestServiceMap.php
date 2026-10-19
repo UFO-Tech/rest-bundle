@@ -95,7 +95,7 @@ class RestServiceMap implements IServiceHolder
             $this->classRoutes[$classFQCN] = ($refClass->getAttributes(Route::class)[0] ?? null)?->newInstance();
 
             if (!$this->classRoutes[$classFQCN]) {
-                $serviceName = $this->toSnakeCaseNameConverter->normalize(explode($service->concat, $service->getName())[0] ?? '');
+                $serviceName = $this->toSnakeCaseNameConverter->normalize(explode($service->concat, $service->name)[0] ?? '');
                 $this->classRoutes[$classFQCN] = new Route(name: $serviceName);
             }
         }
@@ -109,7 +109,7 @@ class RestServiceMap implements IServiceHolder
             : ($classPath === '' ? '/' . $methodPath : $classPath . '/' . $methodPath);
 
         $className = $classRouteAttr->name
-                     ?? $this->toSnakeCaseNameConverter->normalize(explode($service->concat, $service->getName())[0] ?? '');
+                     ?? $this->toSnakeCaseNameConverter->normalize(explode($service->concat, $service->name)[0] ?? '');
         $methodName = $route->name ?? '';
         $concat = ($className !== '' && $methodName !== '') ? '_' : '';
 

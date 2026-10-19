@@ -18,6 +18,25 @@ internal_alias:
     name_prefix: second_
     defaults: { api_group: internal }
     trailing_slash_on_root: false
+errors:
+    resource: ../../config/router.yaml
+    prefix: /errors-api
+    defaults: { api_group: errors }
+    trailing_slash_on_root: false
+typed:
+    resource: ../../config/router.yaml
+    prefix: /typed-api
+    defaults: { api_group: typed }
+    trailing_slash_on_root: false
+adapter:
+    resource: adapter/router.yaml
+    prefix: /adapter
+    trailing_slash_on_root: false
+adapter_internal:
+    resource: adapter/router.yaml
+    prefix: /adapter/internal
+    defaults: { api_group: internal }
+    trailing_slash_on_root: false
 rpc:
     resource: ../../vendor/ufo-tech/json-rpc-bundle/config/router.yaml
     prefix: /rpc

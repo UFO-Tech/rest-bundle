@@ -1,0 +1,4 @@
+adapter_endpoint:
+    path: /
+    controller: Ufo\RestBundleTest\Fixtures\AdapterController
+    methods: [GET]

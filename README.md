@@ -23,6 +23,13 @@ It enables fast deployment of an API layer only for the methods that must be ava
 ![php_version](https://img.shields.io/packagist/dependency-v/ufo-tech/rpc-rest-adapter/php?logo=PHP&logoColor=white)
 ![ufo-tech/rpc-bundle](https://img.shields.io/packagist/dependency-v/ufo-tech/rpc-rest-adapter/ufo-tech/json-rpc-bundle?label=JsonRpcBundle&logo=ufo&logoColor=white)
 
+## 📚 Documentation
+
+- [Documentation](docs/README.md): principles, routing, request lifecycle, errors, OpenAPI/Postman, security, extending, testing.
+- [Release notes](releases/README.md).
+
+---
+
 ## ⚙️ Installation
 
 ```bash
@@ -73,13 +80,18 @@ POST /rest/user/getList
 
 ## ⚙️ How it works
 
-The YAML loader inherits API-group handling from JsonRpcBundle: context is set
+API-group handling of route imports belongs to JsonRpcBundle: context is set
 before route registration, restored afterwards, and route names, priorities and
-legacy aliases are handled centrally. `RestYamlFileLoader` only recognizes the
-REST routing resource and selects `_rest_name_prefix`. Its constructor arguments
-are inherited through autowiring; no separate loader arguments are needed in
-services.yaml. This requires the JsonRpcBundle version containing
-`Routing\ApiYamlFileLoader`; use the matching local checkout during development.
+legacy aliases are handled centrally. `RestRouteImport` (an
+`Ufo\JsonRpcBundle\Routing\IApiRouteImport`) only registers the REST routing
+resource with the core loader and selects `_rest_name_prefix`, so REST works side
+by side with other adapters such as mcp-bundle. Requires
+`ufo-tech/json-rpc-bundle` 10.4.3+.
+
+REST calls are executed by the core `RpcExecutor`: errors go through `rpc.error`
+like RPC calls, and a successful call fires `rpc.post_response` on
+`kernel.terminate`, so `#[CacheRelation]` invalidation and post-response
+listeners work for REST too.
 
 The adapter:
 
@@ -163,7 +175,7 @@ MIT © [UFO-Tech](https://github.com/ufo-tech)
 
 ## Multiple REST API entry points (JsonRpcBundle 10.2+)
 
-Requires PHP 8.4+ and `ufo-tech/json-rpc-bundle` 10.2+. Import the REST
+Requires PHP 8.4+ and `ufo-tech/json-rpc-bundle` 10.4.3+. Import the REST
 routes once per entry point in a YAML routing file:
 
 ```yaml
@@ -230,6 +242,26 @@ same group twice, supply distinct `name_prefix` values; for `internal` with
 REST uses the RPC security configuration and group token providers, including
 `protected_api` and `protected_doc`. Shared RPC cache behavior and the RPC
 restrictions on identically named methods across groups also apply to REST.
+
+## Translated documentation (JsonRpcBundle 10.4+)
+
+OpenAPI and Postman documents use the RPC method translations
+(`translations/rpc.<locale>.yaml`, group overrides in
+`translations/rpc/<group>.<locale>.yaml`, extension directories from
+`ufo_json_rpc.translations.paths`). The language is picked from
+`Accept-Language` the same way as for RPC documentation; responses get
+`Content-Language` and `Vary: Accept-Language`.
+
+```yaml
+# translations/rpc.uk.yaml
+catalog.list:
+    title: Каталог
+    description: Список товарів
+```
+
+In OpenAPI the title becomes the operation `summary` and the description its
+`description`. A method without a title keeps the description as `summary`, as
+before.
 
 Run the regression tests from the repository root:
 
