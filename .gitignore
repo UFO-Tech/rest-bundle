@@ -9,3 +9,5 @@
 .phpunit.result.cache
 .phpunit.cache
 ###< phpunit/phpunit ###
+/.claude/
+/.mcp.json
